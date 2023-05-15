@@ -76,3 +76,42 @@ jobs:
                     bucket: casaos
                     assets: |
                         ./linux-all-casaos-${{ steps.get_version.outputs.VERSION }}.tar.gz:/IceWhaleTech/CasaOS-UI/releases/download/${{ steps.get_version.outputs.VERSION }}/linux-all-casaos-${{ steps.get_version.outputs.VERSION }}.tar.gz
+    publish_aur_package:
+        name: Publish AUR package
+    
+        needs:
+            - release
+        
+        runs-on: ubuntu-latest
+    
+        strategy:
+            fail-fast: true
+            matrix:
+                target:
+                    - x86_64-unknown-linux-gnu
+    
+        steps:
+            - uses: actions/checkout@v3
+    
+            -   name: Download checksums
+                uses: actions/download-artifact@v3
+                with:
+                    name: checksums
+                    path: ./checksums
+    
+            -   name: Generate PKGBUILD
+                env:
+                    TARGET: ${{ matrix.target }}
+                    RELEASE_TAG: ${{ needs.release.outputs.release_tag }}
+                run: ./ci/github-actions/generate-pkgbuild.py
+                            
+            -   name: Publish CasaOS-UI to the AUR
+                uses: KSXGitHub/github-actions-deploy-aur@v2.3.0
+                with:
+                    pkgname: casaos-ui
+                    pkgbuild: ./pkgbuild/casaos-ui/PKGBUILD
+                    commit_username: ${{ secrets.AUR_USERNAME }}
+                    commit_email: ${{ secrets.AUR_EMAIL }}
+                    ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+                    commit_message: ${{ needs.release.outputs.release_tag }}
+                    
